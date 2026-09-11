@@ -48,85 +48,96 @@ export async function analyzeInput({ text = '', imageBase64 = null, mimeType = '
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey || apiKey.trim() === '' || apiKey === 'your_gemini_api_key_here') {
-    console.log('[GeminiService] GEMINI_API_KEY not found or empty. Using intelligent fallback analysis with live location.');
+    console.log('[GeminiService] GEMINI_API_KEY not found or empty. Using intelligent fallback analysis.');
     return generateFallbackAnalysis(text, imageBase64, liveLocation);
   }
 
-  try {
-    const contents = [];
-    const parts = [];
+  // Exact active Gemini models available on API Key
+  const modelsToTry = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-2.5-flash',
+    'gemini-flash-latest'
+  ];
 
-    if (text && text.trim().length > 0) {
-      parts.push({ text: `User Description / Input: ${text.trim()}` });
-    }
+  const contents = [];
+  const parts = [];
 
-    if (liveLocation) {
-      parts.push({ text: `GPS / Device Live Location Provided: ${liveLocation}` });
-    }
+  if (text && text.trim().length > 0) {
+    parts.push({ text: `User Description / Input: ${text.trim()}` });
+  }
 
-    if (imageBase64) {
-      // Clean base64 string if it contains data prefix
-      const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-      parts.push({
-        inlineData: {
-          mimeType: mimeType || 'image/jpeg',
-          data: cleanBase64
-        }
-      });
-      parts.push({ text: 'Analyze this uploaded image along with any text description above. Identify any public service issues visible.' });
-    }
+  if (liveLocation) {
+    parts.push({ text: `GPS / Device Live Location Provided: ${liveLocation}` });
+  }
 
-    if (parts.length === 0 && !liveLocation) {
-      throw new Error('No input provided');
-    }
-
-    contents.push({ parts });
-
-    // Use Gemini 2.0 Flash model via Google AI Studio API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: SYSTEM_INSTRUCTION }]
-        },
-        contents,
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json"
-        }
-      })
+  if (imageBase64) {
+    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    parts.push({
+      inlineData: {
+        mimeType: mimeType || 'image/jpeg',
+        data: cleanBase64
+      }
     });
+    parts.push({ text: 'Analyze this uploaded image along with any text description above. Identify any public service issues visible.' });
+  }
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('[GeminiService] Gemini API returned error:', response.status, errText);
-      return generateFallbackAnalysis(text, imageBase64, liveLocation);
-    }
-
-    const data = await response.json();
-    const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!candidateText) {
-      throw new Error('Empty response received from Gemini model');
-    }
-
-    // Sanitize output text (strip backticks if any)
-    const jsonString = candidateText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-    const parsedJSON = JSON.parse(jsonString);
-
-    if (liveLocation && parsedJSON.extracted_information) {
-      parsedJSON.extracted_information.location = liveLocation;
-    }
-
-    return parsedJSON;
-
-  } catch (error) {
-    console.error('[GeminiService] Error calling Gemini API:', error.message);
+  if (parts.length === 0 && !liveLocation) {
     return generateFallbackAnalysis(text, imageBase64, liveLocation);
   }
+
+  contents.push({ parts });
+
+  for (const modelName of modelsToTry) {
+    try {
+      console.log(`[GeminiService] Attempting analysis with Gemini model: ${modelName}`);
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: SYSTEM_INSTRUCTION }]
+          },
+          contents,
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json"
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`[GeminiService] Model ${modelName} returned status ${response.status}: ${errText}`);
+        continue;
+      }
+
+      const data = await response.json();
+      const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!candidateText) {
+        continue;
+      }
+
+      const jsonString = candidateText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsedJSON = JSON.parse(jsonString);
+
+      if (liveLocation && parsedJSON.extracted_information) {
+        parsedJSON.extracted_information.location = liveLocation;
+      }
+
+      console.log(`[GeminiService] Successfully generated analysis with model: ${modelName}`);
+      return parsedJSON;
+
+    } catch (err) {
+      console.warn(`[GeminiService] Exception calling ${modelName}:`, err.message);
+    }
+  }
+
+  console.log('[GeminiService] All API model attempts failed or rate-limited. Falling back to intelligent heuristic engine.');
+  return generateFallbackAnalysis(text, imageBase64, liveLocation);
 }
 
 /**
