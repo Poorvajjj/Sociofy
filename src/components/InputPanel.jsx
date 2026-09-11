@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, MessageSquareText, Mic, Image, Loader2, RefreshCw, MapPin, X, Check, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, MessageSquareText, Mic, Image, Loader2, RefreshCw, MapPin, X, Check, AlertCircle, Zap } from 'lucide-react';
 import VoiceInput from './VoiceInput';
 import ImageUpload from './ImageUpload';
 import DemoExamples from './DemoExamples';
@@ -14,6 +14,31 @@ export default function InputPanel({ onAnalyze, isLoading, largeText }) {
   const [liveLocation, setLiveLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState('idle'); // idle | detecting | success | error
   const [locationError, setLocationError] = useState('');
+
+  // Animated loading step stage
+  const [loadingStage, setLoadingStage] = useState('Categorizing intent...');
+
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingStage('Categorizing intent...');
+      return;
+    }
+
+    const stages = [
+      'Categorizing intent & assessing urgency...',
+      'Extracting key facts & location...',
+      'Generating professional report...',
+      'Mapping to official government portal...'
+    ];
+
+    let idx = 0;
+    const interval = setInterval(() => {
+      idx = (idx + 1) % stages.length;
+      setLoadingStage(stages[idx]);
+    }, 400);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   const handleGetLiveLocation = () => {
     if (!navigator.geolocation) {
@@ -55,7 +80,7 @@ export default function InputPanel({ onAnalyze, isLoading, largeText }) {
           setLocationError('Could not retrieve current location.');
         }
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 8000, enableHighAccuracy: true }
     );
   };
 
@@ -76,7 +101,7 @@ export default function InputPanel({ onAnalyze, isLoading, largeText }) {
 
   const handleSelectDemo = (demoPrompt) => {
     setText(demoPrompt);
-    // Auto trigger analysis for snappy UX
+    // Trigger fast analysis instantly
     onAnalyze({ text: demoPrompt, imageBase64: null, mimeType: 'image/jpeg', liveLocation });
   };
 
@@ -155,16 +180,14 @@ export default function InputPanel({ onAnalyze, isLoading, largeText }) {
             </div>
           )}
 
-          {/* Input Method Buttons Bar: Voice, Photo, Live GPS Location */}
+          {/* Input Method Buttons Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/60">
             <div className="flex flex-wrap items-center gap-2.5">
               
-              {/* Voice Speech Component */}
               <VoiceInput onTranscriptChange={setText} currentText={text} />
 
               <span className="text-slate-600 font-bold text-xs hidden sm:inline">|</span>
 
-              {/* Photo Upload Component */}
               <ImageUpload
                 imagePreview={imagePreview}
                 setImagePreview={setImagePreview}
@@ -174,7 +197,6 @@ export default function InputPanel({ onAnalyze, isLoading, largeText }) {
 
               <span className="text-slate-600 font-bold text-xs hidden sm:inline">|</span>
 
-              {/* Live Geolocation Button */}
               <button
                 type="button"
                 onClick={handleGetLiveLocation}
@@ -218,11 +240,11 @@ export default function InputPanel({ onAnalyze, isLoading, largeText }) {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin text-slate-950" />
-                  <span>Analyzing with Gemini...</span>
+                  <span>Fast Gemini Processing...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-5 h-5 text-slate-950" />
+                  <Zap className="w-5 h-5 text-slate-950 fill-slate-950" />
                   <span>Analyze with Gemini</span>
                 </>
               )}
@@ -231,13 +253,18 @@ export default function InputPanel({ onAnalyze, isLoading, largeText }) {
 
         </form>
 
-        {/* Loading Progress Feedback */}
+        {/* Rapid Stage Loading Indicator */}
         {isLoading && (
-          <div className="mt-4 p-4 rounded-xl bg-teal-950/60 border border-teal-500/30 text-teal-200 flex items-center space-x-3 animate-pulse">
-            <Loader2 className="w-5 h-5 animate-spin text-teal-400 flex-shrink-0" />
-            <div className="text-xs sm:text-sm">
-              <span className="font-bold text-teal-300">Gemini AI is processing your input...</span>
-              <p className="text-teal-400/80">Identifying category, assessing urgency, location mapping, and preparing report.</p>
+          <div className="mt-4 p-4 rounded-xl bg-teal-950/80 border border-teal-500/40 text-teal-200 flex items-center space-x-3 shadow-lg">
+            <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center flex-shrink-0">
+              <Loader2 className="w-5 h-5 animate-spin text-teal-400" />
+            </div>
+            <div className="text-xs sm:text-sm flex-grow">
+              <div className="font-bold text-teal-300 flex items-center justify-between">
+                <span>Fast AI Pipeline Active</span>
+                <span className="text-[10px] bg-teal-800 text-teal-200 px-2 py-0.5 rounded-full font-mono">Ultra-Fast Model</span>
+              </div>
+              <p className="text-teal-200/90 font-medium mt-0.5">{loadingStage}</p>
             </div>
           </div>
         )}
