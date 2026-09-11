@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased selection:bg-teal-500 selection:text-white;
+  }
+}
+
+/* Custom Accessibility High Contrast Mode */
+.high-contrast {
+  --tw-bg-opacity: 1;
+  background-color: rgb(0 0 0 / var(--tw-bg-opacity));
+  color: rgb(255 255 255);
+}
+
+.high-contrast .bg-white {
+  background-color: #121212 !important;
+  color: #ffffff !important;
+  border-color: #333333 !important;
+}
+
+.high-contrast .bg-slate-50 {
+  background-color: #000000 !important;
+}
+
+.high-contrast .text-slate-600, 
+.high-contrast .text-slate-500 {
+  color: #e2e8f0 !important;
+}
+
+/* Pulse animation for voice recording indicator */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.recording-pulse {
+  animation: pulse-ring 1.8s infinite;
+}
